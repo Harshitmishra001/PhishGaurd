@@ -69,28 +69,30 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 });
 
-// ✅ Google Safe Browsing API Call
 function checkGoogleSafeBrowsing(url, callback) {
-    const apiKey = "YAIzaSyA3FXyV9-M8Tmdl0-3MXLo7c9LjGnfCu0k";
+    const apiKey = "AIzaSyA3FXyV9-M8Tmdl0-3MXLo7c9LjGnfCu0k";
     const apiUrl = `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`;
+
+    let requestBody = {
+        client: { clientId: "PhishGuard", clientVersion: "1.0" },
+        threatInfo: {
+            threatTypes: ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE"],
+            platformTypes: ["ANY_PLATFORM"],
+            threatEntryTypes: ["URL"],
+            threatEntries: [{ url: url }]
+        }
+    };
 
     fetch(apiUrl, {
             method: "POST",
-            body: JSON.stringify({
-                client: { clientId: "PhishGuard", clientVersion: "1.0" },
-                threatInfo: {
-                    threatTypes: ["MALWARE", "SOCIAL_ENGINEERING"],
-                    platformTypes: ["ANY_PLATFORM"],
-                    threatEntryTypes: ["URL"],
-                    threatEntries: [{ url: url }]
-                }
-            }),
-            headers: { "Content-Type": "application/json" }
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody)
         })
         .then(response => response.json())
         .then(data => {
-            if (data.matches) {
+            if (data.matches && data.matches.length > 0) {
                 callback("⚠️ Phishing Detected!");
+                alert("Phishing Detected in the URL");
             } else {
                 callback("✅ Safe");
             }
@@ -100,7 +102,6 @@ function checkGoogleSafeBrowsing(url, callback) {
             callback("❌ Error checking URL.");
         });
 }
-
 // ✅ VirusTotal API Call
 function checkVirusTotalURL(url, callback) {
     const apiKey = "23e5dc864830882098ed10052f4801ef9cb929fbd872fd8a770d1583fb25a19b";

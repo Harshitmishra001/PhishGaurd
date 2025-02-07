@@ -49,7 +49,11 @@ function checkGoogleSafeBrowsing(url, callback) {
         })
         .then(response => response.json())
         .then(data => {
-            callback(data.matches ? "⚠️ Unsafe (Google Safe Browsing)" : "✅ Safe (Google)");
+            if (data.matches && data.matches.length > 0) {
+                callback("⚠️ Unsafe (Google Safe Browsing)");
+            } else {
+                callback("✅ Safe (Google)");
+            }
         })
         .catch(error => {
             console.error("Google Safe Browsing API error:", error);
@@ -89,7 +93,7 @@ function checkVirusTotalFile(fileUrl, downloadId) {
         })
         .then(response => response.json())
         .then(data => {
-            let malicious = data.data.attributes.last_analysis_stats.malicious;
+            let malicious = data.data && data.data.attributes && data.data.attributes.last_analysis_stats ? data.data.attributes.last_analysis_stats.malicious : 0;
             if (malicious > 0) {
                 chrome.downloads.cancel(downloadId); // Cancel the download
                 chrome.notifications.create({
@@ -106,10 +110,12 @@ function checkVirusTotalFile(fileUrl, downloadId) {
 }
 
 // Context Menu to Scan URLs
-chrome.contextMenus.create({
-    id: "scanURL",
-    title: "Scan URL with PhishGuard",
-    contexts: ["link"]
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.contextMenus.create({
+        id: "scanURL",
+        title: "Scan URL with PhishGuard",
+        contexts: ["link"]
+    });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
