@@ -1,5 +1,5 @@
 chrome.runtime.sendMessage({ action: "check_url", url: window.location.href }, function(response) {
-    if (response && response.googleResult && response.googleResult.includes("Unsafe")) {
-        alert("⚠️ Warning: This site may be unsafe!\n" + response.googleResult);
+    if (response && (response.googleResult.includes("Unsafe") || response.vtResult.includes("Unsafe") || response.localResult.includes("Phishing"))) {
+        window.location.href = chrome.runtime.getURL("blocked.html");
     }
 });

@@ -14,22 +14,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-// Listen for downloads
-chrome.downloads.onCreated.addListener(downloadItem => {
-    console.log("Download started:", downloadItem.filename);
-
-    // Get file extension
-    const riskyExtensions = [".exe", ".zip", ".msi", ".apk", ".bat", ".dll", ".scr", ".js"];
-    let isRisky = riskyExtensions.some(ext => downloadItem.filename.toLowerCase().endsWith(ext));
-
-    if (isRisky) {
-        console.log("Potentially risky file detected:", downloadItem.filename);
-
-        // First check with VirusTotal (faster hash lookup)
-        checkVirusTotalFile(downloadItem.finalUrl, downloadItem.id);
-    }
-});
-
 // Function to check URL with Google Safe Browsing
 function checkGoogleSafeBrowsing(url, callback) {
     const API_URL = `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${GOOGLE_API_KEY}`;
@@ -85,30 +69,6 @@ function checkVirusTotalURL(url, callback) {
         .catch(error => {
             console.error("VirusTotal API error:", error);
             callback("❓ Unknown (VirusTotal Error)");
-        });
-}
-
-// Function to check file hash with VirusTotal
-function checkVirusTotalFile(fileUrl, downloadId) {
-    fetch(`https://www.virustotal.com/api/v3/files/${fileUrl}`, {
-            headers: { "x-apikey": VT_API_KEY }
-        })
-        .then(response => response.json())
-        .then(data => {
-            let malicious = data.data && data.data.attributes && data.data.attributes.last_analysis_stats ? data.data.attributes.last_analysis_stats.malicious : 0;
-            if (malicious > 0) {
-                chrome.downloads.cancel(downloadId); // Cancel the download
-                chrome.notifications.create({
-                    type: "basic",
-                    iconUrl: "icon.png",
-                    title: "⚠️ Malicious File Detected",
-                    message: `This file is flagged as unsafe (${malicious} detections)`
-                });
-                alert(`⚠️ Malicious File Detected: This file is flagged as unsafe (${malicious} detections)`);
-            }
-        })
-        .catch(error => {
-            console.error("VirusTotal File Check Error:", error);
         });
 }
 
