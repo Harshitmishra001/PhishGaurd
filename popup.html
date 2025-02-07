@@ -73,6 +73,25 @@
         .status p {
             margin: 5px 0;
         }
+        
+        .blocked-files {
+            text-align: left;
+            margin-top: 20px;
+        }
+        
+        .blocked-files ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        .blocked-files li {
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 
@@ -91,6 +110,13 @@
     </div>
 
     <button id="report">Report Phish</button>
+
+    <div class="blocked-files">
+        <h3>Blocked Files History</h3>
+        <ul id="blockedFilesList">
+            <li>Loading...</li>
+        </ul>
+    </div>
 
     <script src="popup.js"></script>
 </body>

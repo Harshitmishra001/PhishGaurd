@@ -4,9 +4,10 @@ document.addEventListener("DOMContentLoaded", function() {
     let scanButton = document.getElementById("scanButton");
     let urlInput = document.getElementById("urlInput");
     let resultText = document.getElementById("resultText");
+    let blockedFilesList = document.getElementById("blockedFilesList");
 
     // Ensure elements exist before attaching event listeners
-    if (!statusText || !reportButton || !scanButton || !urlInput || !resultText) {
+    if (!statusText || !reportButton || !scanButton || !urlInput || !resultText || !blockedFilesList) {
         console.error("Some elements are missing from popup.html.");
         return;
     }
@@ -48,7 +49,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // ✅ Report Button Click
     reportButton.addEventListener("click", function() {
-        alert("Thank you for reporting. We will review this link.");
+        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+            let currentUrl = tabs[0] ? tabs[0].url : null;
+            if (!currentUrl) return;
+
+            addReportedUrl(currentUrl, "User reported");
+            alert("Thank you for reporting. We will review this link.");
+        });
     });
 
     // ✅ Manual URL Scan (User Input)
@@ -61,14 +68,21 @@ document.addEventListener("DOMContentLoaded", function() {
 
         checkGoogleSafeBrowsing(url, googleResult => {
             checkVirusTotalURL(url, vtResult => {
-                resultText.innerHTML = `🔍 Scan Results:<br>
-                Google: ${googleResult}<br>
-                VirusTotal: ${vtResult}`;
+                checkLocalDatabase(url, localResult => {
+                    resultText.innerHTML = `🔍 Scan Results:<br>
+                    Google: ${googleResult}<br>
+                    VirusTotal: ${vtResult}<br>
+                    Local Database: ${localResult}`;
+                });
             });
         });
     });
+
+    // ✅ Display Blocked Files History
+    displayBlockedFilesHistory();
 });
 
+// ✅ Google Safe Browsing API Call
 function checkGoogleSafeBrowsing(url, callback) {
     const apiKey = "AIzaSyA3FXyV9-M8Tmdl0-3MXLo7c9LjGnfCu0k";
     const apiUrl = `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`;
@@ -102,6 +116,7 @@ function checkGoogleSafeBrowsing(url, callback) {
             callback("❌ Error checking URL.");
         });
 }
+
 // ✅ VirusTotal API Call
 function checkVirusTotalURL(url, callback) {
     const apiKey = "23e5dc864830882098ed10052f4801ef9cb929fbd872fd8a770d1583fb25a19b";
@@ -143,4 +158,97 @@ function checkVirusTotalURL(url, callback) {
             console.error("VirusTotal API error:", error);
             callback("❌ Error submitting URL.");
         });
+}
+
+// ✅ Local Database Check
+function checkLocalDatabase(url, callback) {
+    initDatabase().then(db => {
+        let transaction = db.transaction(["reportedUrls"], "readonly");
+        let store = transaction.objectStore("reportedUrls");
+        let request = store.get(url);
+
+        request.onsuccess = function(event) {
+            if (event.target.result) {
+                callback("⚠️ Reported as Phishing");
+            } else {
+                callback("✅ Not Reported");
+            }
+        };
+
+        request.onerror = function(event) {
+            console.error("Database error:", event.target.errorCode);
+            callback("❓ Unknown (Database Error)");
+        };
+    }).catch(error => {
+        console.error("Error checking local database:", error);
+        callback("❓ Unknown (Database Error)");
+    });
+}
+
+// Function to initialize the database
+function initDatabase() {
+    return new Promise((resolve, reject) => {
+        let request = indexedDB.open("PhishGuardDB", 2); // Increment version to 2
+
+        request.onupgradeneeded = function(event) {
+            let db = event.target.result;
+            if (!db.objectStoreNames.contains("reportedUrls")) {
+                db.createObjectStore("reportedUrls", { keyPath: "url" });
+            }
+            if (!db.objectStoreNames.contains("blockedFiles")) {
+                db.createObjectStore("blockedFiles", { keyPath: "id", autoIncrement: true });
+            }
+        };
+
+        request.onsuccess = function(event) {
+            resolve(event.target.result);
+        };
+
+        request.onerror = function(event) {
+            reject("Database error: " + event.target.errorCode);
+        };
+    });
+}
+
+// Function to add a reported URL to the database
+function addReportedUrl(url, reason) {
+    initDatabase().then(db => {
+        let transaction = db.transaction(["reportedUrls"], "readwrite");
+        let store = transaction.objectStore("reportedUrls");
+        let report = { url: url, reason: reason, timestamp: new Date().toISOString() };
+        store.put(report);
+    }).catch(error => {
+        console.error("Error adding reported URL:", error);
+    });
+}
+
+// Function to display blocked files history
+function displayBlockedFilesHistory() {
+    initDatabase().then(db => {
+        let transaction = db.transaction(["blockedFiles"], "readonly");
+        let store = transaction.objectStore("blockedFiles");
+        let request = store.getAll();
+
+        request.onsuccess = function(event) {
+            let blockedFiles = event.target.result;
+            let blockedFilesList = document.getElementById("blockedFilesList");
+            blockedFilesList.innerHTML = "";
+
+            if (blockedFiles.length > 0) {
+                blockedFiles.forEach(file => {
+                    let listItem = document.createElement("li");
+                    listItem.textContent = `URL: ${file.fileUrl}, Malicious Count: ${file.maliciousCount}, Timestamp: ${file.timestamp}`;
+                    blockedFilesList.appendChild(listItem);
+                });
+            } else {
+                blockedFilesList.innerHTML = "<li>No blocked files found.</li>";
+            }
+        };
+
+        request.onerror = function(event) {
+            console.error("Error retrieving blocked files:", event.target.errorCode);
+        };
+    }).catch(error => {
+        console.error("Error displaying blocked files history:", error);
+    });
 }
